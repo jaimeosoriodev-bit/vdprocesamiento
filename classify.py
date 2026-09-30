@@ -34,11 +34,11 @@ if "localhost" in OLLAMA_API_URL:
     OLLAMA_API_URL = OLLAMA_API_URL.replace("localhost", "127.0.0.1")
 
 # Classification Config
-BATCH_SIZE = 50
-MAX_WORKERS = 4
-PK_COL = config.PK_COL
-OLLAMA_TIMEOUT = 45
-OLLAMA_TEMPERATURE = config.OLLAMA_TEMPERATURE or 0.0
+BATCH_SIZE = config.BATCH_SIZE or 50
+MAX_WORKERS = config.MAX_WORKERS or 4
+PK_COL = config.PK_COL or 'numero_peticion'
+OLLAMA_TIMEOUT = max(30, int(config.OLLAMA_TIMEOUT or 60))
+OLLAMA_TEMPERATURE = config.OLLAMA_TEMPERATURE if config.OLLAMA_TEMPERATURE is not None else 0.0
 OLLAMA_HOST = (config.OLLAMA_HOST or 'http://127.0.0.1:11434').replace("localhost", "127.0.0.1")
 
 def get_classification_config(conn):
@@ -75,10 +75,11 @@ def call_ollama(prompt, model=OLLAMA_MODEL, retries=1):
                 "model": model,
                 "prompt": prompt,
                 "stream": False,
+                "think": False,
                 "keep_alive": "24h",
                 "options": {
                     "temperature": OLLAMA_TEMPERATURE,
-                    "num_predict": 20,
+                    "num_predict": 40,
                     "num_ctx": 512
                 }
             }
@@ -116,7 +117,8 @@ def classify_record(asunto, clase, categories, prompt_template):
     cleaned_response = response.strip().replace("Respuesta:", "").strip()
     
     # Validation
-    if "NO_APLICA" in cleaned_response.upper():
+    cleaned_upper = cleaned_response.upper()
+    if "NO_APLICA" in cleaned_upper or "NO APLICA" in cleaned_upper:
         return "NO_APLICA"
     
     # Try to fuzzy match or check if valid category
@@ -124,12 +126,7 @@ def classify_record(asunto, clase, categories, prompt_template):
         if cat.lower() in cleaned_response.lower():
             return cat
             
-    # Fallback if AI responds with category synonym
-    if clase == "ruido":
-        return "Ruido sin especificar"
-    if clase == "salud":
-        return "Otros"
-        
+    # Default to NO_APLICA if not matching any valid category
     return "NO_APLICA"
 
 def check_ollama_model():
@@ -160,6 +157,7 @@ def check_ollama_model():
                 "model": OLLAMA_MODEL,
                 "prompt": "ping",
                 "stream": False,
+                "think": False,
                 "keep_alive": "24h",
                 "options": {
                     "num_predict": 1,
@@ -335,15 +333,18 @@ def process_single_class(clase, config_data):
                     
                     try:
                         classification = future.result()
-                        if classification == "NO_APLICA":
-                            cat_val = None
-                        elif classification:
-                            cat_val = classification
-                        else:
-                            cat_val = None
                     except Exception as exc:
                         logger.error(f"[{clase.upper()}] Error en {peticion_id}: {exc}")
+                        classification = None
+
+                    if classification is None:
+                        logger.warning(f"[{clase.upper()}] Inferencia fallida/timeout para {peticion_id}. Se deja pendiente para reintento.")
+                        continue
+
+                    if classification == "NO_APLICA":
                         cat_val = None
+                    else:
+                        cat_val = classification
 
                     # Immediate commit per record (eliminates waiting for slow threads)
                     try:
@@ -355,6 +356,10 @@ def process_single_class(clase, config_data):
                     except Exception as e:
                         logger.error(f"[{clase.upper()}] Error guardando {peticion_id}: {e}")
                         conn.rollback()
+
+            if batch_updates == 0 and len(rows) > 0:
+                logger.error(f"[{clase.upper()}] Ningún registro del lote pudo ser procesado por la IA. Abortando clase para evitar bucle.")
+                break
 
             batch_duration = time.time() - batch_start
             rate = batch_updates / batch_duration if batch_duration > 0 else 0
@@ -386,13 +391,11 @@ def process_classification():
         fq_table_main = f'"{SCHEMA_NAME}"."{TABLE_NAME_MAIN}"'
         pk_col = PK_COL
 
-        # Optimization 1: Pre-process empty subjects
+        # Optimization 1: Pre-process empty subjects (keeps only records with actual text for the LLM)
         finalize_empty_asuntos(conn, fq_table_clase, fq_table_main, pk_col)
         
-        # Optimization 2: Filter irrelevant subjects using keywords
-        keywords = config_data.get('filter_keywords', [])
-        if keywords:
-            filter_irrelevant_records(conn, fq_table_clase, fq_table_main, pk_col, keywords)
+        # Optimization 2 (Keywords Filter): OMITIDO para evaluar el 100% de los registros con Inteligencia Artificial.
+        logger.info(f"Filtro de palabras clave omitido para {clase}: se procesará el 100% de los textos con IA.")
             
     conn.close()
 

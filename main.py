@@ -39,8 +39,9 @@ def main():
         
     # 2. Carga en PostgreSQL local
     logger.info("\n>>> FASE 2: EXTRACCIÓN, TRANSFORMACIÓN Y CARGA (ETL) LOCAL")
+    inserted_count = 0
     try:
-        etl.process_etl()
+        inserted_count = etl.process_etl()
     except Exception as e:
         logger.error(f"Falla crítica en Fase 2: {e}")
         sys.exit(1)
@@ -56,30 +57,35 @@ def main():
         logger.error(f"Falla crítica en Fase 3: {e}")
         sys.exit(1)
         
-    # 4. Dump de la base de datos
-    logger.info("\n>>> FASE 4: RESPALDO DE BASE DE DATOS (DUMP)")
-    try:
-        dump_file = dump_db.dump_schema()
-    except Exception as e:
-        logger.error(f"Falla crítica en Fase 4: {e}")
-        sys.exit(1)
-        
-    # 5. Upload a MinIO
-    if dump_file and os.path.exists(dump_file):
-        logger.info("\n>>> FASE 5: SUBIDA DEL RESPALDO A MINIO")
-        try:
-            upload_minio.upload_to_minio(dump_file)
-            
-            # Limpieza del dump local
-            os.remove(dump_file)
-            logger.info(f"Archivo temporal eliminado con éxito: {dump_file}")
-            
-        except Exception as e:
-            logger.error(f"Falla crítica en Fase 5: {e}")
-            sys.exit(1)
+    # 4 y 5. Dump de la base de datos y Upload a MinIO
+    if not inserted_count or inserted_count == 0:
+        logger.info("\n>>> FASES 4 Y 5 OMITIDAS: El ETL reportó 0 registros insertados (sin datos nuevos).")
+        logger.info(">>> No se generará el dump ni se enviará a MinIO para evitar respaldos y transferencias redundantes.")
     else:
-        logger.error("Error: No se pudo localizar el archivo dump de la base de datos para la subida.")
-        sys.exit(1)
+        # 4. Dump de la base de datos
+        logger.info("\n>>> FASE 4: RESPALDO DE BASE DE DATOS (DUMP)")
+        try:
+            dump_file = dump_db.dump_schema()
+        except Exception as e:
+            logger.error(f"Falla crítica en Fase 4: {e}")
+            sys.exit(1)
+            
+        # 5. Upload a MinIO
+        if dump_file and os.path.exists(dump_file):
+            logger.info("\n>>> FASE 5: SUBIDA DEL RESPALDO A MINIO")
+            try:
+                upload_minio.upload_to_minio(dump_file)
+                
+                # Limpieza del dump local
+                os.remove(dump_file)
+                logger.info(f"Archivo temporal eliminado con éxito: {dump_file}")
+                
+            except Exception as e:
+                logger.error(f"Falla crítica en Fase 5: {e}")
+                sys.exit(1)
+        else:
+            logger.error("Error: No se pudo localizar el archivo dump de la base de datos para la subida.")
+            sys.exit(1)
 
     logger.info("\n========================================")
     logger.info("=== PIPELINE COMPLETADO EXITOSAMENTE ===")

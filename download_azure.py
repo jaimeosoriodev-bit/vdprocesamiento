@@ -87,16 +87,55 @@ def download_blob_file(force=False):
 
         logger.info(f"Descargando {BLOB_NAME} a {CSV_FILE} (Tamaño: {blob_size / (1024*1024):.2f} MB)...")
         
-        with open(CSV_FILE, "wb") as my_blob:
-            stream = blob_client.download_blob()
-            with tqdm(total=blob_size, unit='B', unit_scale=True, desc=CSV_FILE) as pbar:
-                for chunk in stream.chunks():
-                    my_blob.write(chunk)
-                    pbar.update(len(chunk))
+        import time
+        CHUNK_SIZE_BYTES = 8 * 1024 * 1024  # 8 MB chunks
+        part_file = f"{CSV_FILE}.part"
         
-        logger.info("Descarga completada exitosamente. Actualizando estado en BD...")
-        set_last_blob_size(blob_size)
-        return True
+        if os.path.exists(CSV_FILE) and os.path.getsize(CSV_FILE) < blob_size:
+            if os.path.exists(part_file):
+                os.remove(part_file)
+            os.rename(CSV_FILE, part_file)
+        
+        initial_offset = 0
+        if os.path.exists(part_file):
+            initial_offset = os.path.getsize(part_file)
+            if initial_offset > blob_size:
+                logger.warning("El archivo temporal parcial excede el tamaño remoto. Reiniciando descarga...")
+                initial_offset = 0
+            elif initial_offset > 0:
+                logger.info(f"Reanudando descarga desde byte {initial_offset} ({initial_offset / (1024*1024):.2f} MB ya descargados)...")
+
+        file_mode = "ab" if initial_offset > 0 else "wb"
+        
+        with open(part_file, file_mode) as my_blob:
+            with tqdm(total=blob_size, initial=initial_offset, unit='B', unit_scale=True, desc=CSV_FILE) as pbar:
+                offset = initial_offset
+                while offset < blob_size:
+                    current_chunk = min(CHUNK_SIZE_BYTES, blob_size - offset)
+                    for attempt in range(1, 6):
+                        try:
+                            stream = blob_client.download_blob(offset=offset, length=current_chunk, timeout=120)
+                            data = stream.readall()
+                            my_blob.write(data)
+                            my_blob.flush()
+                            pbar.update(len(data))
+                            offset += len(data)
+                            break
+                        except Exception as chunk_err:
+                            logger.warning(f"Error descargando fragmento {offset}/{blob_size} (intento {attempt}/5): {chunk_err}")
+                            if attempt == 5:
+                                raise chunk_err
+                            time.sleep(attempt * 2)
+        
+        if os.path.exists(part_file) and os.path.getsize(part_file) == blob_size:
+            if os.path.exists(CSV_FILE):
+                os.remove(CSV_FILE)
+            os.rename(part_file, CSV_FILE)
+            logger.info("Descarga completada exitosamente. Actualizando estado en BD...")
+            set_last_blob_size(blob_size)
+            return True
+        else:
+            raise Exception("El tamaño del archivo descargado no coincide con el tamaño esperado.")
 
     except Exception as e:
         logger.error(f"Error durante la descarga: {e}")

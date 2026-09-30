@@ -3,9 +3,9 @@
 ## 1. Resumen General y Asuntos
 Métrica                       | Cantidad  | Porcentaje
 ------------------------------+-----------+-----------
-Con Asunto (Contenido válido) | 1,323,580 | 35.48%    
-Sin Asunto (Vacíos o Nulos)   | 2,407,278 | 64.52%    
-Total de PQRS                 | 3,730,858 | 100.00%   
+Con Asunto (Contenido válido) | 1,474,118 | 37.98%    
+Sin Asunto (Vacíos o Nulos)   | 2,407,278 | 62.02%    
+Total de PQRS                 | 3,881,396 | 100.00%   
 
 ## 2. Cantidad de PQRS por Mes
 Año-Mes | Cantidad de PQRS
@@ -100,40 +100,42 @@ Año-Mes | Cantidad de PQRS
 2026-04 | 73,774          
 2026-05 | 77,521          
 2026-06 | 65,376          
+2026-07 | 74,105          
+2026-08 | 76,433          
 
 ## 3. Clasificación por Salud
-**Total registros analizados:** 3,730,858
+**Total registros analizados:** 3,881,396
 Estado                              | Cantidad  | Porcentaje
 ------------------------------------+-----------+-----------
-Clasificados Salud (Positivos)      | 111,180   | 2.98%     
-No clasificados (NO APLICA / Otros) | 3,619,678 | 97.02%    
+Clasificados Salud (Positivos)      | 96,535    | 2.49%     
+No clasificados (NO APLICA / Otros) | 3,784,861 | 97.51%    
 
 ### Desglose de Categorías de Salud:
 Subcategoría Salud                                             | Cantidad | % del total salud clasificado
 ---------------------------------------------------------------+----------+------------------------------
-Otros                                                          | 61,802   | 55.59%                       
-Fallas en la prestación del servicio/humanización del servicio | 20,803   | 18.71%                       
-Negación de citas médicas                                      | 20,240   | 18.20%                       
-Negación de Medicamentos                                       | 5,320    | 4.79%                        
-Negación de procedimientos                                     | 3,015    | 2.71%                        
+Fallas en la prestación del servicio/humanización del servicio | 30,846   | 31.95%                       
+Negación de citas médicas                                      | 30,660   | 31.76%                       
+Otros                                                          | 22,721   | 23.54%                       
+Negación de Medicamentos                                       | 7,154    | 7.41%                        
+Negación de procedimientos                                     | 5,154    | 5.34%                        
 
 ## 4. Clasificación por Ruido
-**Total registros analizados:** 3,730,858
+**Total registros analizados:** 3,881,396
 Estado                              | Cantidad  | Porcentaje
 ------------------------------------+-----------+-----------
-Clasificados Ruido (Positivos)      | 12,019    | 0.32%     
-No clasificados (NO APLICA / Otros) | 3,718,839 | 99.68%    
+Clasificados Ruido (Positivos)      | 14,039    | 0.36%     
+No clasificados (NO APLICA / Otros) | 3,867,357 | 99.64%    
 
 ### Desglose de Categorías de Ruido:
 Subcategoría Ruido                                        | Cantidad | % del total ruido clasificado
 ----------------------------------------------------------+----------+------------------------------
-Ruido por comercio (comercio - bar, comercio - gastrobar) | 4,911    | 40.86%                       
-Ruido por vecinos                                         | 1,617    | 13.45%                       
-Ruido sin especificar                                     | 1,453    | 12.09%                       
-Ruido por actividades lúdicas                             | 1,159    | 9.64%                        
-Ruido por construcción                                    | 844      | 7.02%                        
-Ruido por tráfico vehicular                               | 592      | 4.93%                        
-Ruido por servicios                                       | 552      | 4.59%                        
-Ruido por industria                                       | 456      | 3.79%                        
-Ruido por ventas ambulantes                               | 419      | 3.49%                        
-Ruido por tráfico aéreo                                   | 16       | 0.13%                        
+Ruido por comercio (comercio - bar, comercio - gastrobar) | 5,087    | 36.23%                       
+Ruido sin especificar                                     | 2,129    | 15.16%                       
+Ruido por vecinos                                         | 1,902    | 13.55%                       
+Ruido por actividades lúdicas                             | 1,551    | 11.05%                       
+Ruido por construcción                                    | 1,031    | 7.34%                        
+Ruido por tráfico vehicular                               | 753      | 5.36%                        
+Ruido por servicios                                       | 557      | 3.97%                        
+Ruido por industria                                       | 528      | 3.76%                        
+Ruido por ventas ambulantes                               | 480      | 3.42%                        
+Ruido por tráfico aéreo                                   | 21       | 0.15%                        

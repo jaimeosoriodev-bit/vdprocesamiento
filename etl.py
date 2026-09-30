@@ -94,7 +94,7 @@ def process_etl():
     
     if not os.path.exists(CSV_FILE):
         logger.info(f"No se encontró el archivo {CSV_FILE} localmente. Saltando ETL local ya que no hay datos nuevos.")
-        return
+        return 0
 
     conn = get_db_connection()
     
@@ -284,6 +284,8 @@ def process_etl():
     print(f"Not inserted (Already Existed): {total_existing}")
     print(f"Not inserted (Errors): {total_errors}")
     print("="*40)
+
+    return total_inserted
 
 if __name__ == "__main__":
     process_etl()
