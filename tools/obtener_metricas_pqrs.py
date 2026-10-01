@@ -1,5 +1,6 @@
 import os
 import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import psycopg2
 from psycopg2 import sql
 import config
@@ -128,6 +129,38 @@ def obtener_metricas():
             )
             cur.execute(query_ruido_breakdown)
             rows_ruido_breakdown = cur.fetchall()
+
+            # 5. Cantidad de registros clasificados por maltrato animal
+            print("Consultando clasificaciones de maltrato animal...")
+            table_animal = f"{table_main}_maltrato_animal"
+            query_animal_total = sql.SQL("""
+                SELECT 
+                    COUNT(*) FILTER (WHERE clasificacion IS NOT NULL) AS clasificados,
+                    COUNT(*) FILTER (WHERE clasificacion IS NULL) AS no_clasificados,
+                    COUNT(*) AS total,
+                    COUNT(*) FILTER (WHERE procesado = TRUE) AS procesados,
+                    COUNT(*) FILTER (WHERE procesado = FALSE) AS pendientes
+                FROM {schema}.{table_animal};
+            """).format(
+                schema=sql.Identifier(schema),
+                table_animal=sql.Identifier(table_animal)
+            )
+            cur.execute(query_animal_total)
+            clasificados_animal, no_clasificados_animal, total_animal, procesados_animal, pendientes_animal = cur.fetchone()
+            
+            # Desglose maltrato animal
+            query_animal_breakdown = sql.SQL("""
+                SELECT clasificacion, COUNT(*) AS total
+                FROM {schema}.{table_animal}
+                WHERE clasificacion IS NOT NULL
+                GROUP BY clasificacion
+                ORDER BY total DESC;
+            """).format(
+                schema=sql.Identifier(schema),
+                table_animal=sql.Identifier(table_animal)
+            )
+            cur.execute(query_animal_breakdown)
+            rows_animal_breakdown = cur.fetchall()
             
         conn.close()
         
@@ -181,6 +214,22 @@ def obtener_metricas():
             report_content.append(format_table(["Subcategoría Ruido", "Cantidad", "% del total ruido clasificado"], ruido_breakdown_rows))
         else:
             report_content.append("*No hay registros clasificados en categorías de ruido.*")
+        report_content.append("")
+
+        # 5. Clasificación por Maltrato Animal
+        report_content.append("## 5. Clasificación por Maltrato Animal")
+        report_content.append(f"**Total registros:** {total_animal:,} | **Procesados:** {procesados_animal:,} | **Pendientes:** {pendientes_animal:,}")
+        animal_total_rows = [
+            ["Clasificados Maltrato Animal (Positivos)", f"{clasificados_animal:,}", f"{(clasificados_animal/total_animal)*100:.2f}%" if total_animal > 0 else "0.00%"],
+            ["No clasificados (NO APLICA / No Animal)", f"{no_clasificados_animal:,}", f"{(no_clasificados_animal/total_animal)*100:.2f}%" if total_animal > 0 else "0.00%"]
+        ]
+        report_content.append(format_table(["Estado", "Cantidad", "Porcentaje"], animal_total_rows))
+        report_content.append("\n### Desglose de Categorías de Maltrato Animal:")
+        if rows_animal_breakdown:
+            animal_breakdown_rows = [[r[0], f"{r[1]:,}", f"{(r[1]/clasificados_animal)*100:.2f}%" if clasificados_animal > 0 else "0.00%"] for r in rows_animal_breakdown]
+            report_content.append(format_table(["Categoría", "Cantidad", "% del total clasificado"], animal_breakdown_rows))
+        else:
+            report_content.append("*No hay registros clasificados aún en categorías de maltrato animal.*")
         report_content.append("")
         
         report_text = "\n".join(report_content)

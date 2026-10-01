@@ -93,35 +93,32 @@ def init_db_structure():
         cols_def_list_clase = [f"{pk_col} TEXT PRIMARY KEY"]
         # Add Foreign Key constraint logic could be added here, but simple PK is enough for optimization structure base.
         # Ideally: REFERENCES PQRS.tcc_registradas(numero_peticion)        
-        # Add the additional column
+        # Add the additional columns
         cols_def_list_clase.append("clasificacion TEXT")
         cols_def_list_clase.append("procesado BOOLEAN DEFAULT FALSE")
+        cols_def_list_clase.append("metodo_clasificacion CHARACTER VARYING")
         
         cols_def_clase = ", ".join(cols_def_list_clase)
         
         for clase in TABLE_NAME_CLASES:
-            # Construct table name: tcc_registradas_ruido, tcc_registradas_salud, etc.
+            # Construct table name: tcc_registradas_ruido, tcc_registradas_salud, tcc_registradas_maltrato_animal, etc.
             current_table_name = f"{TABLE_NAME}_{clase}"
             fq_table_name_clase = sql.SQL("{}.{}").format(sql.Identifier(SCHEMA_NAME), sql.Identifier(current_table_name))
-            
-            # Drop if exists to ensure fresh structure
-            # We construct explicit drop query
-            drop_query = sql.SQL("DROP TABLE IF EXISTS {}").format(fq_table_name_clase)
+            idx_name = f"idx_{current_table_name}_pendientes"
             
             create_query_clase = sql.SQL("CREATE TABLE IF NOT EXISTS {} ({})").format(
                 fq_table_name_clase,
                 sql.SQL(cols_def_clase)
             )
+            create_idx_clase = sql.SQL("CREATE INDEX IF NOT EXISTS {} ON {} (procesado) WHERE procesado = FALSE").format(
+                sql.Identifier(idx_name),
+                fq_table_name_clase
+            )
             
             with conn.cursor() as cur:
                 logger.info(f"Checking table {SCHEMA_NAME}.{current_table_name}...")
-                
-                # Drop
-                cur.execute(drop_query)
-                
-                # Create
-                logger.info(f"Creating table {SCHEMA_NAME}.{current_table_name}...")
                 cur.execute(create_query_clase)
+                cur.execute(create_idx_clase)
                 conn.commit()
             
         logger.info(f"Structure initialized successfully in schema {SCHEMA_NAME}.")

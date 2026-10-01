@@ -139,3 +139,13 @@ Ruido por servicios                                       | 557      | 3.97%
 Ruido por industria                                       | 528      | 3.76%                        
 Ruido por ventas ambulantes                               | 480      | 3.42%                        
 Ruido por tráfico aéreo                                   | 21       | 0.15%                        
+
+## 5. Clasificación por Maltrato Animal
+**Total registros:** 3,881,396 | **Procesados:** 0 | **Pendientes:** 3,881,396
+Estado                                   | Cantidad  | Porcentaje
+-----------------------------------------+-----------+-----------
+Clasificados Maltrato Animal (Positivos) | 0         | 0.00%     
+No clasificados (NO APLICA / No Animal)  | 3,881,396 | 100.00%   
+
+### Desglose de Categorías de Maltrato Animal:
+*No hay registros clasificados aún en categorías de maltrato animal.*

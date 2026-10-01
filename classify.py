@@ -101,10 +101,11 @@ def classify_record(asunto, clase, categories, prompt_template):
     
     # Construct prompt
     categories_list = "\n- ".join(categories)
+    clase_display = clase.replace("_", " ")
     
     prompt = prompt_template.format(
-        clase_upper=clase.upper(),
-        clase=clase,
+        clase_upper=clase_display.upper(),
+        clase=clase_display,
         categories_list="- " + categories_list,
         asunto=asunto_clean
     )
@@ -370,7 +371,7 @@ def process_single_class(clase, config_data):
     finally:
         conn.close()
 
-def process_classification():
+def process_classification(target_class=None):
     conn = get_db_connection()
     if not conn:
         return
@@ -380,6 +381,15 @@ def process_classification():
         logger.error("No se encontró configuración de clasificación en la base de datos.")
         conn.close()
         return
+
+    if target_class:
+        if target_class in db_config:
+            logger.info(f"Filtro de ejecución activado para la clase: {target_class}")
+            db_config = {target_class: db_config[target_class]}
+        else:
+            logger.error(f"Clase '{target_class}' no encontrada en config_clasificacion. Disponibles: {list(db_config.keys())}")
+            conn.close()
+            return
 
     # Phase 1: Global Optimization (SQL Updates)
     logger.info("=== FASE 1: OPTIMIZACIÓN GLOBAL (Filtros SQL) ===")
@@ -416,10 +426,10 @@ def process_classification():
                 logger.error(f"Error procesando clase {clase_name}: {e}")
 
 if __name__ == "__main__":
+    import sys
     logger.info("Iniciando proceso de clasificación con Ollama...")
     if not check_ollama_model():
         logger.error("Modelo no encontrado. Abortando para evitar errores. Asegurate de tener el modelo instalado.")
-        import sys
         sys.exit(1)
 
     try:
@@ -429,5 +439,6 @@ if __name__ == "__main__":
         logger.warning("No se pudo conectar a Ollama en localhost:11434. Asegúrate que esté corriendo.")
         # Proceed anyway, calls will fail and log errors.
     
-    process_classification()
+    target_arg = sys.argv[1] if len(sys.argv) > 1 else None
+    process_classification(target_class=target_arg)
     logger.info("Proceso finalizado.")
