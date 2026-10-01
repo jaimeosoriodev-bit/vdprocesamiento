@@ -15,9 +15,9 @@ logger = logging.getLogger(__name__)
 # Reduction in requests noise
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-# Optimized HTTP Session with Connection Pooling for Metal GPU throughput
+# Optimized HTTP Session with Connection Pooling for Local & Cloud APIs
 http_session = requests.Session()
-adapter = requests.adapters.HTTPAdapter(pool_connections=50, pool_maxsize=50, max_retries=1)
+adapter = requests.adapters.HTTPAdapter(pool_connections=150, pool_maxsize=150, max_retries=1)
 http_session.mount('http://', adapter)
 http_session.mount('https://', adapter)
 
@@ -46,6 +46,8 @@ CLASSIFIER_ENGINE = (config.CLASSIFIER_ENGINE or "OLLAMA").strip().upper()
 TYPESAFE_API_KEY = config.TYPESAFE_API_KEY
 JEV_MODEL = config.JEV_MODEL or "jev-latest"
 TYPESAFE_API_URL = config.TYPESAFE_API_URL or "https://api.typesafe.ai/v1/systemone"
+JEV_MAX_WORKERS = getattr(config, "JEV_MAX_WORKERS", 20)
+JEV_BATCH_SIZE = getattr(config, "JEV_BATCH_SIZE", 200)
 
 def get_classification_config(conn):
     try:
@@ -177,6 +179,11 @@ def call_jev(asunto, clase, categories, retries=1):
             if response.status_code == 401:
                 logger.error("Error de autenticación con TypeSafe Jev (401). Verifica tu JEV_TOKEN / TYPESAFE_API_KEY en .env.")
                 return None
+            if response.status_code == 429:
+                wait_time = max(2, int(response.headers.get("Retry-After", 2 * (attempt + 1))))
+                logger.warning(f"Rate limit 429 en TypeSafe Jev. Esperando {wait_time}s antes de reintentar (intento {attempt+1}/{retries+1})...")
+                time.sleep(wait_time)
+                continue
             response.raise_for_status()
             result = response.json()
             answer = result.get("answers", {}).get("clasificacion", {})
@@ -184,7 +191,7 @@ def call_jev(asunto, clase, categories, retries=1):
             return choice
         except Exception as e:
             if attempt < retries:
-                time.sleep(0.5)
+                time.sleep(0.5 * (attempt + 1))
                 continue
             logger.error(f"Error calling TypeSafe Jev: {e}")
             return None
@@ -421,7 +428,14 @@ def process_single_class(clase, config_data):
     except Exception:
         total_pending = 0
 
-    logger.info(f"--- [START] Procesando clasificación con IA para: {clase} ({total_pending} pendientes) ---")
+    if CLASSIFIER_ENGINE == "JEV":
+        effective_batch_size = JEV_BATCH_SIZE
+        effective_workers = JEV_MAX_WORKERS
+    else:
+        effective_batch_size = BATCH_SIZE
+        effective_workers = MAX_WORKERS
+
+    logger.info(f"--- [START] Procesando clasificación con IA para: {clase} ({total_pending} pendientes) | Motor: {CLASSIFIER_ENGINE} (Hilos: {effective_workers}, Lote: {effective_batch_size}) ---")
     
     total_processed = 0
     start_time_all = time.time()
@@ -442,7 +456,7 @@ def process_single_class(clase, config_data):
             )
             
             with conn.cursor() as cur:
-                cur.execute(fetch_query, (BATCH_SIZE,))
+                cur.execute(fetch_query, (effective_batch_size,))
                 rows = cur.fetchall()
             
             if not rows:
@@ -463,7 +477,7 @@ def process_single_class(clase, config_data):
             )
             
             # Parallel Execution with Real-Time Streaming Commits
-            with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=effective_workers) as executor:
                 future_to_row = {
                     executor.submit(classify_record, row[1], clase, categories, prompt_template): row 
                     for row in rows
