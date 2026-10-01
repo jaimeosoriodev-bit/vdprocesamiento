@@ -141,11 +141,13 @@ Ruido por ventas ambulantes                               | 480      | 3.42%
 Ruido por tráfico aéreo                                   | 21       | 0.15%                        
 
 ## 5. Clasificación por Maltrato Animal
-**Total registros:** 3,881,396 | **Procesados:** 0 | **Pendientes:** 3,881,396
+**Total registros:** 3,881,396 | **Procesados:** 2,436,131 | **Pendientes:** 1,445,265
 Estado                                   | Cantidad  | Porcentaje
 -----------------------------------------+-----------+-----------
-Clasificados Maltrato Animal (Positivos) | 0         | 0.00%     
-No clasificados (NO APLICA / No Animal)  | 3,881,396 | 100.00%   
+Clasificados Maltrato Animal (Positivos) | 267       | 0.01%     
+No clasificados (NO APLICA / No Animal)  | 3,881,129 | 99.99%    
 
 ### Desglose de Categorías de Maltrato Animal:
-*No hay registros clasificados aún en categorías de maltrato animal.*
+Categoría       | Cantidad | % del total clasificado
+----------------+----------+------------------------
+Maltrato Animal | 267      | 100.00%                
