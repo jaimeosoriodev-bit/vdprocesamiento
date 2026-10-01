@@ -39,6 +39,15 @@ MINIO_ENDPOINT = None
 MINIO_BUCKET = None
 MINIO_PATH = None
 
+# Engine selector: OLLAMA or JEV
+CLASSIFIER_ENGINE = os.getenv("CLASSIFICATION_ENGINE", os.getenv("CLASSIFIER_ENGINE", "OLLAMA")).strip().upper()
+
+# TypeSafe Jev Configuration
+JEV_TOKEN = os.getenv("JEV_TOKEN") or os.getenv("TYPESAFE_API_KEY")
+TYPESAFE_API_KEY = JEV_TOKEN
+JEV_MODEL = os.getenv("JEV_MODEL", "jev-latest")
+TYPESAFE_API_URL = os.getenv("TYPESAFE_API_URL", "https://api.typesafe.ai/v1/systemone")
+
 # Secrets directly from .env
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY")

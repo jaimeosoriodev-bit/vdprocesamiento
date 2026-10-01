@@ -41,6 +41,12 @@ OLLAMA_TIMEOUT = max(30, int(config.OLLAMA_TIMEOUT or 60))
 OLLAMA_TEMPERATURE = config.OLLAMA_TEMPERATURE if config.OLLAMA_TEMPERATURE is not None else 0.0
 OLLAMA_HOST = (config.OLLAMA_HOST or 'http://127.0.0.1:11434').replace("localhost", "127.0.0.1")
 
+# Engine Configuration: OLLAMA o JEV
+CLASSIFIER_ENGINE = (config.CLASSIFIER_ENGINE or "OLLAMA").strip().upper()
+TYPESAFE_API_KEY = config.TYPESAFE_API_KEY
+JEV_MODEL = config.JEV_MODEL or "jev-latest"
+TYPESAFE_API_URL = config.TYPESAFE_API_URL or "https://api.typesafe.ai/v1/systemone"
+
 def get_classification_config(conn):
     try:
         with conn.cursor() as cur:
@@ -94,41 +100,175 @@ def call_ollama(prompt, model=OLLAMA_MODEL, retries=1):
             logger.error(f"Error calling Ollama: {e}")
             return None
 
+def build_jev_criteria(clase, categories):
+    clase_clean = clase.lower().strip()
+    clase_display = clase.replace("_", " ")
+    
+    criteria = {
+        "NO_APLICA": f"El asunto NO está relacionado con {clase_display} o corresponde a otros temas no pertinentes."
+    }
+    
+    if clase_clean == "maltrato_animal":
+        criteria["NO_APLICA"] = "El asunto NO corresponde a maltrato animal (trata sobre otros trámites, salud humana, ruido, tenencia responsable rutinaria, vacunación o esterilización preventiva sin denuncia de maltrato)."
+        for cat in categories:
+            if "maltrato" in cat.lower():
+                criteria[cat] = "Denuncias o situaciones de maltrato, abandono, agresiones físicas, encierro indebido, desnutrición, falta de auxilio o crueldad hacia animales."
+            else:
+                criteria[cat] = f"El asunto corresponde a {cat}."
+    elif clase_clean == "salud":
+        criteria["NO_APLICA"] = "El asunto NO tiene ninguna relación con el sector salud ni atención médica."
+        for cat in categories:
+            if "prestación" in cat.lower() or "humanización" in cat.lower():
+                criteria[cat] = "Quejas por mala atención, tratos inhumanos, demoras graves o fallas en la prestación del servicio de salud."
+            elif "citas" in cat.lower():
+                criteria[cat] = "Negación, falta de agenda o trabas para asignación de citas médicas generales o con especialista."
+            elif "medicamento" in cat.lower():
+                criteria[cat] = "No entrega, desabastecimiento, demoras o negación de medicamentos formulados."
+            elif "procedimiento" in cat.lower():
+                criteria[cat] = "Negación, dilación o falta de autorización de cirugías, exámenes o procedimientos médicos."
+            elif "otros" in cat.lower():
+                criteria[cat] = "Otras peticiones o quejas vinculadas al sistema de salud que no corresponden a las categorías anteriores."
+            else:
+                criteria[cat] = f"El asunto corresponde a {cat}."
+    elif clase_clean == "ruido":
+        criteria["NO_APLICA"] = "El asunto NO tiene relación con quejas o denuncias por ruido o contaminación acústica."
+        for cat in categories:
+            criteria[cat] = f"El asunto corresponde a quejas por {cat.lower()}."
+    else:
+        for cat in categories:
+            criteria[cat] = f"El asunto corresponde específicamente a {cat}."
+            
+    return criteria
+
+def call_jev(asunto, clase, categories, retries=1):
+    if not TYPESAFE_API_KEY:
+        logger.error("TYPESAFE_API_KEY / JEV_TOKEN no configurado en .env.")
+        return None
+        
+    asunto_clean = str(asunto)[:800].strip()
+    clase_display = clase.replace("_", " ")
+    criteria = build_jev_criteria(clase, categories)
+    
+    payload = {
+        "state": {"asunto": asunto_clean},
+        "model": JEV_MODEL,
+        "questions": {
+            "clasificacion": {
+                "type": "choice",
+                "instructions": f"Determinar si el asunto de la petición ciudadana PQRS corresponde a {clase_display} y seleccionar la subcategoría adecuada, o 'NO_APLICA'.",
+                "criteria": criteria
+            }
+        }
+    }
+    
+    headers = {
+        "Authorization": f"Bearer {TYPESAFE_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    for attempt in range(retries + 1):
+        try:
+            response = http_session.post(
+                TYPESAFE_API_URL, 
+                json=payload, 
+                headers=headers, 
+                timeout=30
+            )
+            if response.status_code == 401:
+                logger.error("Error de autenticación con TypeSafe Jev (401). Verifica tu JEV_TOKEN / TYPESAFE_API_KEY en .env.")
+                return None
+            response.raise_for_status()
+            result = response.json()
+            answer = result.get("answers", {}).get("clasificacion", {})
+            choice = answer.get("choice")
+            return choice
+        except Exception as e:
+            if attempt < retries:
+                time.sleep(0.5)
+                continue
+            logger.error(f"Error calling TypeSafe Jev: {e}")
+            return None
+
+def check_jev_connection():
+    if not TYPESAFE_API_KEY:
+        logger.error("Falta JEV_TOKEN / TYPESAFE_API_KEY en .env.")
+        return False
+    try:
+        headers = {
+            "Authorization": f"Bearer {TYPESAFE_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        test_payload = {
+            "state": "ping",
+            "model": JEV_MODEL,
+            "questions": {
+                "ping": {
+                    "type": "noul",
+                    "instructions": "Is this a connection test?"
+                }
+            }
+        }
+        res = http_session.post(TYPESAFE_API_URL, json=test_payload, headers=headers, timeout=10)
+        if res.status_code == 200:
+            logger.info(f"OK: Conexión con TypeSafe Jev exitosa (Modelo: {JEV_MODEL}).")
+            return True
+        elif res.status_code == 401:
+            logger.error("Error 401 Unauthorized: El JEV_TOKEN / TYPESAFE_API_KEY en .env no es válido.")
+            return False
+        else:
+            logger.warning(f"Respuesta inesperada de TypeSafe Jev ({res.status_code}): {res.text}")
+            return False
+    except Exception as e:
+        logger.error(f"No se pudo conectar a la API de TypeSafe: {e}")
+        return False
+
 def classify_record(asunto, clase, categories, prompt_template):
     if not asunto:
         return None
-    asunto_clean = str(asunto)[:600].strip()
-    
-    # Construct prompt
-    categories_list = "\n- ".join(categories)
-    clase_display = clase.replace("_", " ")
-    
-    prompt = prompt_template.format(
-        clase_upper=clase_display.upper(),
-        clase=clase_display,
-        categories_list="- " + categories_list,
-        asunto=asunto_clean
-    )
-    
-    response = call_ollama(prompt)
-    if not response:
-        return None
         
-    # Clean response
-    cleaned_response = response.strip().replace("Respuesta:", "").strip()
-    
-    # Validation
-    cleaned_upper = cleaned_response.upper()
-    if "NO_APLICA" in cleaned_upper or "NO APLICA" in cleaned_upper:
+    if CLASSIFIER_ENGINE == "JEV":
+        choice = call_jev(asunto, clase, categories)
+        if not choice:
+            return None
+        if choice == "NO_APLICA":
+            return "NO_APLICA"
+        for cat in categories:
+            if cat.lower() == choice.lower() or cat.lower() in choice.lower():
+                return cat
         return "NO_APLICA"
-    
-    # Try to fuzzy match or check if valid category
-    for cat in categories:
-        if cat.lower() in cleaned_response.lower():
-            return cat
+    else:
+        asunto_clean = str(asunto)[:600].strip()
+        
+        # Construct prompt
+        categories_list = "\n- ".join(categories)
+        clase_display = clase.replace("_", " ")
+        
+        prompt = prompt_template.format(
+            clase_upper=clase_display.upper(),
+            clase=clase_display,
+            categories_list="- " + categories_list,
+            asunto=asunto_clean
+        )
+        
+        response = call_ollama(prompt)
+        if not response:
+            return None
             
-    # Default to NO_APLICA if not matching any valid category
-    return "NO_APLICA"
+        # Clean response
+        cleaned_response = response.strip().replace("Respuesta:", "").strip()
+        
+        # Validation
+        cleaned_upper = cleaned_response.upper()
+        if "NO_APLICA" in cleaned_upper or "NO APLICA" in cleaned_upper:
+            return "NO_APLICA"
+        
+        # Try to fuzzy match or check if valid category
+        for cat in categories:
+            if cat.lower() in cleaned_response.lower():
+                return cat
+                
+        # Default to NO_APLICA if not matching any valid category
+        return "NO_APLICA"
 
 def check_ollama_model():
     try:
@@ -312,9 +452,10 @@ def process_single_class(clase, config_data):
             batch_start = time.time()
             batch_updates = 0
             
+            metodo_val = 'JEV' if CLASSIFIER_ENGINE == 'JEV' else 'IA'
             update_query = sql.SQL("""
                 UPDATE {table}
-                SET clasificacion = %s, procesado = %s, metodo_clasificacion = 'IA'
+                SET clasificacion = %s, procesado = %s, metodo_clasificacion = %s
                 WHERE {pk} = %s
             """).format(
                 table=sql.SQL(fq_table_clase),
@@ -350,7 +491,7 @@ def process_single_class(clase, config_data):
                     # Immediate commit per record (eliminates waiting for slow threads)
                     try:
                         with conn.cursor() as cur:
-                            cur.execute(update_query, (cat_val, True, peticion_id))
+                            cur.execute(update_query, (cat_val, True, metodo_val, peticion_id))
                             conn.commit()
                         batch_updates += 1
                         total_processed += 1
@@ -427,17 +568,29 @@ def process_classification(target_class=None):
 
 if __name__ == "__main__":
     import sys
-    logger.info("Iniciando proceso de clasificación con Ollama...")
-    if not check_ollama_model():
-        logger.error("Modelo no encontrado. Abortando para evitar errores. Asegurate de tener el modelo instalado.")
-        sys.exit(1)
+    logger.info("Iniciando proceso de clasificación...")
+    logger.info(f"Motor de inferencia configurado: {CLASSIFIER_ENGINE}")
+    
+    if CLASSIFIER_ENGINE == "JEV":
+        logger.info(f"Usando TypeSafe System One (Modelo: {JEV_MODEL})")
+        if not TYPESAFE_API_KEY:
+            logger.error("Error: CLASSIFIER_ENGINE está configurado como 'JEV', pero JEV_TOKEN / TYPESAFE_API_KEY no está definido en .env.")
+            sys.exit(1)
+        if not check_jev_connection():
+            logger.error("No se pudo autenticar con TypeSafe Jev. Verifica tu token.")
+            sys.exit(1)
+    else:
+        logger.info(f"Usando Ollama Local (Modelo: {OLLAMA_MODEL})")
+        if not check_ollama_model():
+            logger.error("Modelo de Ollama no encontrado. Abortando para evitar errores. Asegurate de tener el modelo instalado.")
+            sys.exit(1)
 
-    try:
-        requests.get(OLLAMA_HOST, timeout=5)
-        logger.info("Ollama detectado correctamente.")
-    except Exception:
-        logger.warning("No se pudo conectar a Ollama en localhost:11434. Asegúrate que esté corriendo.")
-        # Proceed anyway, calls will fail and log errors.
+        try:
+            requests.get(OLLAMA_HOST, timeout=5)
+            logger.info("Ollama detectado correctamente.")
+        except Exception:
+            logger.warning("No se pudo conectar a Ollama en localhost:11434. Asegúrate que esté corriendo.")
+            # Proceed anyway, calls will fail and log errors.
     
     target_arg = sys.argv[1] if len(sys.argv) > 1 else None
     process_classification(target_class=target_arg)
