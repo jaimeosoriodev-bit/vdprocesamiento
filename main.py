@@ -46,12 +46,17 @@ def main():
         logger.error(f"Falla crítica en Fase 2: {e}")
         sys.exit(1)
         
-    # 3. Procesamiento con Ollama
-    logger.info("\n>>> FASE 3: CLASIFICACIÓN CON INTELIGENCIA ARTIFICIAL (OLLAMA)")
+    # 3. Procesamiento con Motor de IA
+    logger.info(f"\n>>> FASE 3: CLASIFICACIÓN CON INTELIGENCIA ARTIFICIAL ({classify.CLASSIFIER_ENGINE} - {classify.OLLAMA_MODEL if classify.CLASSIFIER_ENGINE == 'OLLAMA' else classify.JEV_MODEL})")
     try:
-        if not classify.check_ollama_model():
-            logger.error("Modelo de Ollama no disponible. Abortando pipeline para prevenir falsos positivos.")
-            sys.exit(1)
+        if classify.CLASSIFIER_ENGINE == "OLLAMA":
+            if not classify.check_ollama_model():
+                logger.error("Modelo de Ollama no disponible. Abortando pipeline para prevenir falsos positivos.")
+                sys.exit(1)
+        elif classify.CLASSIFIER_ENGINE == "JEV":
+            if not classify.check_jev_connection():
+                logger.error("Conexión con TypeSafe Jev falló. Abortando pipeline.")
+                sys.exit(1)
         classify.process_classification()
     except Exception as e:
         logger.error(f"Falla crítica en Fase 3: {e}")

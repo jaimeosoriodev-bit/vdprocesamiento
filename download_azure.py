@@ -76,12 +76,14 @@ def download_blob_file(force=False):
         blob_size = properties.size
         last_size = get_last_blob_size()
 
-        if not force and last_size == blob_size:
-            logger.info("El archivo remoto tiene el mismo tamaño que el último procesado. Saltando descarga.")
+        if not force and last_size == blob_size and os.path.exists(CSV_FILE):
+            logger.info("El archivo remoto tiene el mismo tamaño que el último procesado y ya existe localmente. Saltando descarga.")
             return False
         else:
             if force and last_size == blob_size:
                 logger.info("Fuerzo de descarga activado (el archivo remoto tiene el mismo tamaño). Descargando de todos modos...")
+            elif not os.path.exists(CSV_FILE):
+                logger.info(f"El archivo local {CSV_FILE} no existe. Descargando desde Azure...")
             else:
                 logger.info(f"El tamaño remoto difiere o es nuevo (Último: {last_size}, Remoto: {blob_size}). Descargando...")
 

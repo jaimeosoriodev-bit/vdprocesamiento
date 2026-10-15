@@ -277,6 +277,70 @@ def classify_record(asunto, clase, categories, prompt_template):
         # Default to NO_APLICA if not matching any valid category
         return "NO_APLICA"
 
+def ensure_ollama_parallel(num_parallel=4):
+    """
+    Garantiza que el servicio de Ollama se ejecute con OLLAMA_NUM_PARALLEL=4 por defecto,
+    evitando que opere en modo secuencial mono-hilo (-np 1).
+    """
+    import os
+    import subprocess
+    import shutil
+
+    os.environ["OLLAMA_NUM_PARALLEL"] = str(num_parallel)
+    try:
+        subprocess.run(["launchctl", "setenv", "OLLAMA_NUM_PARALLEL", str(num_parallel)], capture_output=True, text=True, check=False)
+    except Exception:
+        pass
+
+    is_running = False
+    try:
+        r = http_session.get(OLLAMA_HOST, timeout=2)
+        if r.status_code == 200:
+            is_running = True
+    except Exception:
+        is_running = False
+
+    needs_restart = False
+    if is_running:
+        try:
+            ps_out = subprocess.run(["ps", "aux"], capture_output=True, text=True).stdout
+            for line in ps_out.splitlines():
+                if "llama-server" in line and "-np 1 " in line:
+                    logger.warning(f"Ollama detectado en modo mono-hilo (-np 1). Reiniciando con OLLAMA_NUM_PARALLEL={num_parallel}...")
+                    needs_restart = True
+                    break
+        except Exception:
+            pass
+
+    if not is_running or needs_restart:
+        if needs_restart:
+            subprocess.run(["pkill", "-9", "-f", "llama-server"], capture_output=True)
+            subprocess.run(["pkill", "-9", "-f", "ollama serve"], capture_output=True)
+            subprocess.run(["pkill", "-9", "-f", "Ollama"], capture_output=True)
+            time.sleep(1)
+
+        logger.info(f"Iniciando servicio de Ollama con OLLAMA_NUM_PARALLEL={num_parallel}...")
+        env = os.environ.copy()
+        env["OLLAMA_NUM_PARALLEL"] = str(num_parallel)
+
+        ollama_bin = shutil.which("ollama") or "/usr/local/bin/ollama"
+        if os.path.exists(ollama_bin):
+            subprocess.Popen([ollama_bin, "serve"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            subprocess.Popen(["open", "-a", "Ollama"], env=env)
+
+        for _ in range(20):
+            time.sleep(0.5)
+            try:
+                r = http_session.get(OLLAMA_HOST, timeout=2)
+                if r.status_code == 200:
+                    logger.info(f"Ollama iniciado correctamente con OLLAMA_NUM_PARALLEL={num_parallel}.")
+                    break
+            except Exception:
+                pass
+    else:
+        logger.info(f"Servicio Ollama verificado (OLLAMA_NUM_PARALLEL={num_parallel}).")
+
 def check_ollama_model():
     try:
         res = http_session.get(f"{OLLAMA_API_URL.replace('/api/generate', '/api/tags')}", timeout=5)
@@ -476,7 +540,11 @@ def process_single_class(clase, config_data):
                 pk=sql.Identifier(pk_col)
             )
             
-            # Parallel Execution with Real-Time Streaming Commits
+            # Commit por lote cada 10 registros procesados
+            COMMIT_BATCH_SIZE = 10
+            uncommitted_count = 0
+
+            # Parallel Execution with Streaming Commits every 10 records
             with concurrent.futures.ThreadPoolExecutor(max_workers=effective_workers) as executor:
                 future_to_row = {
                     executor.submit(classify_record, row[1], clase, categories, prompt_template): row 
@@ -502,16 +570,31 @@ def process_single_class(clase, config_data):
                     else:
                         cat_val = classification
 
-                    # Immediate commit per record (eliminates waiting for slow threads)
+                    # Commit por lote cada 10 registros procesados
                     try:
                         with conn.cursor() as cur:
                             cur.execute(update_query, (cat_val, True, metodo_val, peticion_id))
-                            conn.commit()
                         batch_updates += 1
                         total_processed += 1
+                        uncommitted_count += 1
+
+                        if uncommitted_count >= COMMIT_BATCH_SIZE:
+                            conn.commit()
+                            uncommitted_count = 0
                     except Exception as e:
                         logger.error(f"[{clase.upper()}] Error guardando {peticion_id}: {e}")
                         conn.rollback()
+                        uncommitted_count = 0
+
+                # Commit de cualquier registro remanente (1-9 registros) al finalizar el lote
+                if uncommitted_count > 0:
+                    try:
+                        conn.commit()
+                        uncommitted_count = 0
+                    except Exception as e:
+                        logger.error(f"[{clase.upper()}] Error en commit final de lote para {clase}: {e}")
+                        conn.rollback()
+                        uncommitted_count = 0
 
             if batch_updates == 0 and len(rows) > 0:
                 logger.error(f"[{clase.upper()}] Ningún registro del lote pudo ser procesado por la IA. Abortando clase para evitar bucle.")
@@ -536,6 +619,9 @@ def process_classification(target_class=None):
         logger.error("No se encontró configuración de clasificación en la base de datos.")
         conn.close()
         return
+
+    if CLASSIFIER_ENGINE != "JEV":
+        ensure_ollama_parallel(num_parallel=4)
 
     if target_class:
         if target_class in db_config:
@@ -594,6 +680,7 @@ if __name__ == "__main__":
             logger.error("No se pudo autenticar con TypeSafe Jev. Verifica tu token.")
             sys.exit(1)
     else:
+        ensure_ollama_parallel(num_parallel=4)
         logger.info(f"Usando Ollama Local (Modelo: {OLLAMA_MODEL})")
         if not check_ollama_model():
             logger.error("Modelo de Ollama no encontrado. Abortando para evitar errores. Asegurate de tener el modelo instalado.")

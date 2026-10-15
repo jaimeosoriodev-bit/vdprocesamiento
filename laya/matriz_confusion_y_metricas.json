@@ -1,0 +1,224 @@
+{
+  "metadata": {
+    "modelo": "convaiinnovations/laya",
+    "checkpoint": "multilingual",
+    "total_muestras": 1000,
+    "tiempo_total_segundos": 23.09,
+    "throughput_req_por_segundo": 43.3,
+    "latencia_promedio_ms": 23.09
+  },
+  "resumen_global": {
+    "total": 1000,
+    "coincidencias_exactas": 500,
+    "porcentaje_acuerdo": 50.0,
+    "confianza_promedio": 0.6683
+  },
+  "por_clase": {
+    "ruido": {
+      "total": 350,
+      "coincidencias": 62,
+      "acuerdo_pct": 17.71,
+      "latencia_promedio_ms": 31.48,
+      "confianza_promedio": 0.4485,
+      "subcategorias": {
+        "Ruido por actividades lúdicas": {
+          "total": 35,
+          "coincidencias": 33,
+          "acuerdo_pct": 94.29,
+          "distribucion_predicha_laya": {
+            "Ruido por actividades lúdicas": 33,
+            "Ruido por ventas ambulantes": 1,
+            "Ruido por industria": 1
+          }
+        },
+        "Ruido por comercio (comercio - bar, comercio - gastrobar)": {
+          "total": 35,
+          "coincidencias": 1,
+          "acuerdo_pct": 2.86,
+          "distribucion_predicha_laya": {
+            "Ruido por actividades lúdicas": 31,
+            "Ruido por ventas ambulantes": 3,
+            "Ruido por comercio (comercio - bar, comercio - gastrobar)": 1
+          }
+        },
+        "Ruido por construcción": {
+          "total": 35,
+          "coincidencias": 3,
+          "acuerdo_pct": 8.57,
+          "distribucion_predicha_laya": {
+            "Ruido por actividades lúdicas": 27,
+            "Ruido por ventas ambulantes": 3,
+            "Ruido por construcción": 3,
+            "Ruido por tráfico vehicular": 1,
+            "Ruido por servicios": 1
+          }
+        },
+        "Ruido por industria": {
+          "total": 35,
+          "coincidencias": 5,
+          "acuerdo_pct": 14.29,
+          "distribucion_predicha_laya": {
+            "Ruido por actividades lúdicas": 25,
+            "Ruido por ventas ambulantes": 3,
+            "Ruido por construcción": 1,
+            "Ruido por industria": 5,
+            "Ruido por comercio (comercio - bar, comercio - gastrobar)": 1
+          }
+        },
+        "Ruido por servicios": {
+          "total": 35,
+          "coincidencias": 0,
+          "acuerdo_pct": 0.0,
+          "distribucion_predicha_laya": {
+            "Ruido por actividades lúdicas": 29,
+            "Ruido por ventas ambulantes": 3,
+            "Ruido por construcción": 1,
+            "Ruido sin especificar": 2
+          }
+        },
+        "Ruido por tráfico aéreo": {
+          "total": 23,
+          "coincidencias": 6,
+          "acuerdo_pct": 26.09,
+          "distribucion_predicha_laya": {
+            "Ruido por actividades lúdicas": 13,
+            "Ruido por ventas ambulantes": 3,
+            "Ruido por tráfico aéreo": 6,
+            "Ruido por construcción": 1
+          }
+        },
+        "Ruido por tráfico vehicular": {
+          "total": 35,
+          "coincidencias": 1,
+          "acuerdo_pct": 2.86,
+          "distribucion_predicha_laya": {
+            "Ruido por actividades lúdicas": 26,
+            "Ruido por vecinos": 1,
+            "Ruido por industria": 1,
+            "Ruido sin especificar": 2,
+            "Ruido por ventas ambulantes": 3,
+            "Ruido por construcción": 1,
+            "Ruido por tráfico vehicular": 1
+          }
+        },
+        "Ruido por vecinos": {
+          "total": 35,
+          "coincidencias": 3,
+          "acuerdo_pct": 8.57,
+          "distribucion_predicha_laya": {
+            "Ruido por actividades lúdicas": 29,
+            "Ruido por construcción": 1,
+            "Ruido por vecinos": 3,
+            "Ruido por comercio (comercio - bar, comercio - gastrobar)": 2
+          }
+        },
+        "Ruido por ventas ambulantes": {
+          "total": 35,
+          "coincidencias": 9,
+          "acuerdo_pct": 25.71,
+          "distribucion_predicha_laya": {
+            "Ruido por ventas ambulantes": 9,
+            "Ruido por actividades lúdicas": 25,
+            "Ruido por construcción": 1
+          }
+        },
+        "Ruido sin especificar": {
+          "total": 47,
+          "coincidencias": 1,
+          "acuerdo_pct": 2.13,
+          "distribucion_predicha_laya": {
+            "Ruido por actividades lúdicas": 40,
+            "Ruido por construcción": 1,
+            "Ruido por comercio (comercio - bar, comercio - gastrobar)": 2,
+            "Ruido por tráfico vehicular": 1,
+            "Ruido sin especificar": 1,
+            "Ruido por tráfico aéreo": 1,
+            "Ruido por vecinos": 1
+          }
+        }
+      }
+    },
+    "salud": {
+      "total": 350,
+      "coincidencias": 138,
+      "acuerdo_pct": 39.43,
+      "latencia_promedio_ms": 18.71,
+      "confianza_promedio": 0.6036,
+      "subcategorias": {
+        "Fallas en la prestación del servicio/humanización del servicio": {
+          "total": 70,
+          "coincidencias": 56,
+          "acuerdo_pct": 80.0,
+          "distribucion_predicha_laya": {
+            "Fallas en la prestación del servicio/humanización del servicio": 56,
+            "Otros": 5,
+            "Negación de Medicamentos": 5,
+            "Negación de citas médicas": 4
+          }
+        },
+        "Negación de citas médicas": {
+          "total": 70,
+          "coincidencias": 32,
+          "acuerdo_pct": 45.71,
+          "distribucion_predicha_laya": {
+            "Fallas en la prestación del servicio/humanización del servicio": 30,
+            "Negación de citas médicas": 32,
+            "Otros": 2,
+            "Negación de Medicamentos": 6
+          }
+        },
+        "Negación de Medicamentos": {
+          "total": 70,
+          "coincidencias": 32,
+          "acuerdo_pct": 45.71,
+          "distribucion_predicha_laya": {
+            "Fallas en la prestación del servicio/humanización del servicio": 32,
+            "Negación de Medicamentos": 32,
+            "Otros": 2,
+            "Negación de citas médicas": 4
+          }
+        },
+        "Negación de procedimientos": {
+          "total": 70,
+          "coincidencias": 2,
+          "acuerdo_pct": 2.86,
+          "distribucion_predicha_laya": {
+            "Fallas en la prestación del servicio/humanización del servicio": 42,
+            "Otros": 16,
+            "Negación de Medicamentos": 6,
+            "Negación de procedimientos": 2,
+            "Negación de citas médicas": 4
+          }
+        },
+        "Otros": {
+          "total": 70,
+          "coincidencias": 16,
+          "acuerdo_pct": 22.86,
+          "distribucion_predicha_laya": {
+            "Fallas en la prestación del servicio/humanización del servicio": 46,
+            "Otros": 16,
+            "Negación de citas médicas": 2,
+            "Negación de Medicamentos": 6
+          }
+        }
+      }
+    },
+    "maltrato_animal": {
+      "total": 300,
+      "coincidencias": 300,
+      "acuerdo_pct": 100.0,
+      "latencia_promedio_ms": 18.36,
+      "confianza_promedio": 1.0,
+      "subcategorias": {
+        "Maltrato Animal": {
+          "total": 300,
+          "coincidencias": 300,
+          "acuerdo_pct": 100.0,
+          "distribucion_predicha_laya": {
+            "Maltrato Animal": 300
+          }
+        }
+      }
+    }
+  }
+}
